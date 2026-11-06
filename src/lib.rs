@@ -125,6 +125,46 @@ pub fn display_path(root: &Path, path: &Path) -> String {
     path.strip_prefix(root).unwrap_or(path).display().to_string()
 }
 
+/// What a drag-and-drop onto the window means.
+#[derive(Debug, PartialEq)]
+pub enum Dropped {
+    /// A folder was dropped: list everything in it.
+    Folder(PathBuf),
+    /// Only files were dropped: list just these. `root` is the folder that
+    /// holds all of them, where results are saved.
+    Files { root: PathBuf, files: Vec<PathBuf> },
+}
+
+/// A dropped folder wins over dropped files; with only files, the list is
+/// limited to them.
+pub fn classify_drop(paths: &[PathBuf]) -> Option<Dropped> {
+    if let Some(dir) = paths.iter().find(|p| p.is_dir()) {
+        return Some(Dropped::Folder(dir.clone()));
+    }
+    let files: Vec<PathBuf> = paths.iter().filter(|p| p.is_file()).cloned().collect();
+    let root = common_folder(&files)?;
+    Some(Dropped::Files { root, files })
+}
+
+/// Deepest folder containing every file; `None` when there are no files or
+/// they share no folder (different drives).
+pub fn common_folder(files: &[PathBuf]) -> Option<PathBuf> {
+    let mut candidate = files.first()?.parent()?.to_path_buf();
+    while !files.iter().all(|f| f.starts_with(&candidate)) {
+        candidate = candidate.parent()?.to_path_buf();
+    }
+    Some(candidate)
+}
+
+/// The text files among `files` that still exist, without repeats, sorted
+/// like a folder scan.
+pub fn text_files_only(root: &Path, files: &[PathBuf]) -> Vec<PathBuf> {
+    let mut kept: Vec<PathBuf> = files.iter().filter(|p| p.is_file() && is_text_file(p)).cloned().collect();
+    kept.sort_by_key(|p| display_path(root, p).to_lowercase());
+    kept.dedup();
+    kept
+}
+
 /// How a text file's bytes were encoded, so an edited file is saved back the same way.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TextEncoding {
@@ -787,6 +827,44 @@ mod tests {
         assert_eq!(normalize_extension("nfo").as_deref(), Some("nfo"));
         assert_eq!(normalize_extension("tex, nfo"), None);
         assert_eq!(normalize_extension("  "), None);
+    }
+
+    #[test]
+    fn dropping_files_lists_only_those_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir(root.join("sub")).unwrap();
+        for f in ["a.txt", "b.md", "other.txt", "sub/c.txt"] {
+            fs::write(root.join(f), "texto").unwrap();
+        }
+        fs::write(root.join("img.png"), b"\x89PNG\0\0").unwrap();
+
+        // One file: only that file, results saved next to it.
+        let one = classify_drop(&[root.join("a.txt")]).unwrap();
+        assert_eq!(one, Dropped::Files { root: root.to_path_buf(), files: vec![root.join("a.txt")] });
+
+        // Files from different subfolders share their closest common folder.
+        let many = vec![root.join("sub").join("c.txt"), root.join("b.md"), root.join("img.png"), root.join("b.md")];
+        let Some(Dropped::Files { root: common, files }) = classify_drop(&many) else { panic!("expected files") };
+        assert_eq!(common, root);
+        let listed: Vec<_> = text_files_only(&common, &files).iter().map(|p| display_path(&common, p)).collect();
+        assert_eq!(listed, vec!["b.md", &format!("sub{}c.txt", std::path::MAIN_SEPARATOR)]);
+    }
+
+    #[test]
+    fn dropping_a_folder_lists_the_whole_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir(root.join("sub")).unwrap();
+        fs::write(root.join("a.txt"), "x").unwrap();
+        assert_eq!(classify_drop(&[root.join("sub")]), Some(Dropped::Folder(root.join("sub"))));
+        // A folder dropped together with files still means "the whole folder".
+        assert_eq!(
+            classify_drop(&[root.join("a.txt"), root.join("sub")]),
+            Some(Dropped::Folder(root.join("sub")))
+        );
+        assert_eq!(classify_drop(&[]), None);
+        assert_eq!(classify_drop(&[root.join("missing.txt")]), None);
     }
 
     #[test]

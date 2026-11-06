@@ -13,8 +13,8 @@ use txt_merge::edit::{
 };
 use txt_merge::{
     CombineOptions, CombineReport, EXPORT_EXTENSIONS, PRESET_SEPARATORS, SEPARATOR_VARIABLES,
-    Segment, TextEncoding, combine_to_folder, display_path, normalize_extension, read_preview,
-    render, save_text, scan,
+    Dropped, Segment, TextEncoding, classify_drop, combine_to_folder, display_path,
+    normalize_extension, read_preview, render, save_text, scan, text_files_only,
 };
 
 use theme::{Palette, Theme};
@@ -122,6 +122,9 @@ impl Prefs {
 struct Settings {
     lang: Lang,
     folder: Option<PathBuf>,
+    /// Files dragged onto the window. When set, the list holds only these
+    /// instead of the whole `folder` (which is then the folder holding them).
+    dropped_files: Option<Vec<PathBuf>>,
     /// Extension the combined file is exported with.
     export_extension: String,
     /// When true, `custom_extension` is used instead of `export_extension`.
@@ -151,6 +154,7 @@ impl Default for Settings {
             edit_folder: "editados".to_owned(),
             lang: Lang::system(),
             folder: None,
+            dropped_files: None,
             export_extension: "txt".to_owned(),
             use_custom: false,
             custom_extension: String::new(),
@@ -204,8 +208,9 @@ impl Settings {
     /// Everything that changes which files a scan finds.
     fn scan_key(&self) -> String {
         format!(
-            "{:?}|{}|{:?}|{}",
+            "{:?}|{:?}|{}|{:?}|{}",
             self.folder,
+            self.dropped_files,
             self.subfolders,
             self.output_name(),
             self.edit_folder_name()
@@ -440,8 +445,25 @@ impl App {
         }
         if let Some(dir) = dialog.pick_folder() {
             self.settings.folder = Some(dir);
+            self.settings.dropped_files = None;
             self.status = Status::Idle;
         }
+    }
+
+    /// Dropping a folder lists all of it; dropping files lists only them.
+    fn take_drop(&mut self, paths: &[PathBuf]) {
+        match classify_drop(paths) {
+            Some(Dropped::Folder(dir)) => {
+                self.settings.folder = Some(dir);
+                self.settings.dropped_files = None;
+            }
+            Some(Dropped::Files { root, files }) => {
+                self.settings.folder = Some(root);
+                self.settings.dropped_files = Some(files);
+            }
+            None => return,
+        }
+        self.status = Status::Idle;
     }
 
     fn start_scan_if_needed(&mut self) {
@@ -457,13 +479,20 @@ impl App {
         let output_name = self.settings.output_name();
         let edit_folder = self.settings.edit_folder_name();
         let subfolders = self.settings.subfolders;
+        let dropped = self.settings.dropped_files.clone();
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
-            let exclude = |p: &Path| {
-                output_name.as_deref().is_some_and(|n| is_previous_output(p, n))
-                    || is_in_edit_folder(&root, p, &edit_folder)
+            let found = match dropped {
+                // Files the user chose by hand are listed even if named like an output.
+                Some(files) => text_files_only(&root, &files),
+                None => {
+                    let exclude = |p: &Path| {
+                        output_name.as_deref().is_some_and(|n| is_previous_output(p, n))
+                            || is_in_edit_folder(&root, p, &edit_folder)
+                    };
+                    scan(&root, subfolders, &exclude)
+                }
             };
-            let found = scan(&root, subfolders, &exclude);
             let _ = tx.send((key, found));
         });
         self.scan_rx = Some(rx);
@@ -913,6 +942,7 @@ impl App {
             Pending::Clear => {
                 self.preview = None;
                 self.settings.folder = None;
+                self.settings.dropped_files = None;
                 self.files.clear();
                 self.list_filter.clear();
                 self.scanned_key = None;
@@ -1425,12 +1455,8 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let dropped: Vec<PathBuf> =
             ctx.input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
-        if let Some(p) = dropped.into_iter().next() {
-            let dir = if p.is_dir() { Some(p) } else { p.parent().map(Path::to_path_buf) };
-            if dir.is_some() {
-                self.settings.folder = dir;
-                self.status = Status::Idle;
-            }
+        if !dropped.is_empty() {
+            self.take_drop(&dropped);
         }
 
         self.poll_workers();
@@ -1484,6 +1510,16 @@ impl eframe::App for App {
                 match &self.settings.folder {
                     Some(d) => {
                         ui.label(egui::RichText::new(d.display().to_string()).strong());
+                        if self.settings.dropped_files.is_some() {
+                            ui.label(
+                                egui::RichText::new(l.t("(dropped files only)", "(solo archivos arrastrados)"))
+                                    .color(palette.text_weak),
+                            )
+                            .on_hover_text(l.t(
+                                "Only the files you dragged in are listed. Drop a folder or use \"Choose folder\" to list a whole folder.",
+                                "Solo se listan los archivos que arrastraste. Arrastra una carpeta o usa \"Elegir carpeta\" para listar una carpeta entera.",
+                            ));
+                        }
                         let open = ui
                             .small_button(l.t("Open", "Abrir"))
                             .on_hover_text(l.t("Open this folder in Explorer", "Abrir esta carpeta en el Explorador"));

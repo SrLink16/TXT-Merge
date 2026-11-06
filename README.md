@@ -35,12 +35,12 @@ It is completely portable, ultra-fast, and requires zero installation.
 * **Smart Text Detection**: Automatically distinguishes valid text files from binary files by inspecting encodings and headers.
 * **Multi-Format Export**: Combine files into `.txt`, `.md`, `.csv`, `.tsv`, `.json`, `.yaml`, `.xml`, `.html`, `.toml`, `.sql`, `.srt`, and more.
 * **Custom Separators**: Insert headers, filenames, relative paths, or custom divider lines between files.
-* **Drag & Drop**: Drop entire folders or specific files directly into the window.
+* **Drag & Drop**: Drop a folder to list all its text files, or drop one or more files to work with just those.
 * **Encoding Support**: Automatic detection and decoding for UTF-8, UTF-16, Latin-1, and Windows-1252.
 
 ### 📝 Batch Editor
 * **Multi-File Search & Replace**: Apply plain text or regex find-and-replace rules across all scanned files simultaneously.
-* **Live Diff View**: Visual side-by-side or inline diff inspection before committing any changes to disk.
+* **Live Diff View**: GitHub-style inline diff (`-` removed, `+` added) before committing any changes to disk.
 * **Non-Destructive**: Safe previews ensure no files are overwritten unexpectedly.
 
 ### 🎨 Modern Interface

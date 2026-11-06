@@ -35,7 +35,7 @@ Es totalmente portátil, ultrarrápida y no requiere instalación.
 * **Detección inteligente de texto**: Reconoce archivos de texto y filtra automáticamente binarios analizando encabezados y codificación.
 * **Exportación multiformato**: Unifica archivos en `.txt`, `.md`, `.csv`, `.tsv`, `.json`, `.yaml`, `.xml`, `.html`, `.toml`, `.sql`, `.srt` y muchos más.
 * **Separadores personalizables**: Agrega encabezados con nombres de archivo, rutas relativas, saltos o líneas divisorias entre cada texto.
-* **Arrastrar y Soltar (Drag & Drop)**: Arrastra carpetas completas o listas de archivos directamente a la ventana.
+* **Arrastrar y Soltar (Drag & Drop)**: Arrastra una carpeta para listar todos sus archivos de texto, o uno o varios archivos para trabajar solo con ellos.
 * **Compatibilidad de codificación**: Detección y decodificación automática para UTF-8, UTF-16, Latin-1 y Windows-1252.
 
 ### 📝 Editor por Lotes (Batch Editor)
