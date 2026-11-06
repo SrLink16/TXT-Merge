@@ -49,6 +49,46 @@ It is completely portable, ultra-fast, and requires zero installation.
 
 ---
 
+## 🔤 Separator Variables
+
+Write these tags in the separator and each one is replaced for every file. The value after `:` can be edited.
+
+| Variable | Replaced with |
+|---|---|
+| `<Inc Nr:1>` | Ascending number. `<Inc Nr:10>` starts at 10; `<Inc Nr:001>` pads with zeros (001, 002…) |
+| `<Inc NrDir:1>` | Ascending number that restarts in each folder |
+| `<Inc Alpha:A>` | Ascending letter: A, B … Z, AA. `<Inc Alpha:c>` starts at c in lowercase |
+| `<Name>` | File name without extension |
+| `<Ext>` | File extension without the dot |
+| `<FolderName:1>` | Name of the file's folder; `2` is the folder above it, and so on |
+| `<Num Files>` | Number of listed files in the same folder |
+| `<Num Dirs>` | Number of folders inside the file's folder |
+| `<Num Items>` | Total number of files being merged |
+| `<Word:1>` | Word N of the file name |
+| `<RWord:1>` | Word N counting from the end of the file name |
+| `<MediaType>` | Media (MIME) type from the extension, e.g. `text/markdown` |
+
+Example: `=== <Inc Nr:1>/<Num Items> - <Name> ===` becomes `=== 3/12 - Report ===`.
+An empty value (`<Inc Nr:>`) uses the default; an invalid one is left as written.
+
+---
+
+## ✏️ Batch Edit Operations
+
+The **Edit** tab applies these steps to every checked file, in this order:
+
+1. **Delete lines by number** — e.g. `1-3, 10, 20-` (`20-` means from line 20 to the end).
+2. **Delete lines containing** a text.
+   * *Also delete the empty line left after it* (on by default), so removing a title leaves no blank line at the top.
+3. **Replace text** — plain text or regular expressions (`$1` inserts group 1), with an optional *Match case*. An empty replacement deletes the match.
+4. **Trim spaces** at the start and end of each line.
+5. **Remove empty lines**, or **keep at most one empty line in a row**. Lines with only spaces count as empty.
+
+Before applying, press **View** on a file to see the **Changes** (GitHub-style diff), the **Result**, or the **Original** (editable).
+Results are saved as **copies in a new subfolder** (`editados`, `editados (2)`…) or **overwrite the originals**. Each file keeps its encoding and line endings.
+
+---
+
 ## 🚀 Download & Installation
 
 ### Windows (Portable)
@@ -71,6 +111,21 @@ cargo build --release
 ```
 
 The compiled binary will be located in `target/release/TXT-Merge.exe`.
+
+---
+
+## 📋 Changelog
+
+### v0.2.0
+* Dropping one or more files now lists only those files; dropping a folder still lists the whole folder.
+* The top bar shows *(dropped files only)* when the list comes from dropped files.
+* Fixed building from source (Rust edition 2024).
+
+### v0.1.0 — Initial Launch
+* File merger with multi-format export, custom separators and separator variables.
+* Batch editor with a GitHub-style diff preview.
+* File viewer and editor with line numbers that keeps each file's encoding.
+* Light and dark themes; English and Spanish interface.
 
 ---
 
